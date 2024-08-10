@@ -20,7 +20,7 @@ public class TestYohan extends LinearOpMode {
     private SampleMecanumDrive drive = null;
     private Servo servo = null;
 
-    public TestYohan() {
+    public void initHardware() {
         drive = new SampleMecanumDrive(hardwareMap);
         servo = hardwareMap.get(Servo.class, "test");
     }
@@ -36,12 +36,15 @@ public class TestYohan extends LinearOpMode {
 
     @Override
     public void runOpMode() throws InterruptedException {
+        initHardware();
+
         waitForStart();
 
         if (isStopRequested()) return;
 
         TrajectorySequence traj = drive.trajectorySequenceBuilder(new Pose2d())
                 .forward(24)
+                .strafeRight(24)
                 // run the servo
                 .addDisplacementMarker(() -> {
                     servo.setPosition(0);
