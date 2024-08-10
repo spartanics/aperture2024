@@ -8,6 +8,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.Servo;
 
 import org.firstinspires.ftc.teamcode.drive.SampleMecanumDrive;
+import org.firstinspires.ftc.teamcode.trajectorysequence.TrajectorySequence;
 
 /*
  * This is an example of a more complex path to really test the tuning.
@@ -18,10 +19,18 @@ public class samHWmarkers extends LinearOpMode {
     @Override
     public void runOpMode() throws InterruptedException {
         SampleMecanumDrive drive = new SampleMecanumDrive(hardwareMap);
-
+        testServo = hardwareMap.get(Servo.class, "test");
         waitForStart();
 
         if (isStopRequested()) return;
+        TrajectorySequence trajseq = drive.trajectorySequenceBuilder(new Pose2d())
+                .forward(10)
+                .strafeRight(5)
+                .splineTo(new Vector2d(30, 30), Math.toRadians(0))
+                .strafeLeft(10)
+                .back(3)
+                .splineTo(new Vector2d(0,0),Math.toRadians(0))
+                .build();
 
         Trajectory displacetraj = drive.trajectoryBuilder(new Pose2d())
                 .splineTo(new Vector2d(30, 30), Math.toRadians(0))
@@ -51,12 +60,13 @@ public class samHWmarkers extends LinearOpMode {
                 .build();
 
         testServo.setPosition(0);
-        drive.followTrajectory(displacetraj);
+//        drive.followTrajectory(displacetraj);
+//
+//        drive.followTrajectory(temporaltraj);
+//
+//        drive.followTrajectory(spatialtraj);
 
-        drive.followTrajectory(temporaltraj);
-
-        drive.followTrajectory(spatialtraj);
-
+        drive.followTrajectorySequence(trajseq);
 
 
     }
