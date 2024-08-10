@@ -8,6 +8,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.Servo;
 
 import org.firstinspires.ftc.teamcode.drive.SampleMecanumDrive;
+import org.firstinspires.ftc.teamcode.trajectorysequence.TrajectorySequence;
 
 /*
  * This is an example of a more complex path to really test the tuning.
@@ -48,6 +49,30 @@ public class testJonathan extends LinearOpMode {
                 })
                 .build();
 
-        drive.followTrajectory(ford);
+
+        TrajectorySequence sample = drive.trajectorySequenceBuilder(new Pose2d())
+                .addTemporalMarker(0.5, () -> {
+                    testServo.setPosition(1);
+                })
+                .addTemporalMarker(1, () -> {
+                    testServo.setPosition(0);
+                })
+                .addDisplacementMarker(30, () -> {
+                    testServo.setPosition(1);
+                })
+                .lineToLinearHeading(new Pose2d(30, 0, Math.toRadians(180)))
+                .lineToConstantHeading(new Vector2d(40, 40))
+                .addDisplacementMarker(() -> {
+                    testServo.setPosition(0.5);
+                })
+                .lineToConstantHeading(new Vector2d(0,0))
+                .lineToLinearHeading(new Pose2d(10, -10, 0))
+                .addSpatialMarker(new Vector2d(10,-10), () -> {
+                    testServo.setPosition(0);
+                })
+                .splineToConstantHeading(new Vector2d(0, 0), 0)
+                .build();
+        //drive.followTrajectory(ford);
+        drive.followTrajectorySequence(sample);
     }
 }
