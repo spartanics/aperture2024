@@ -29,12 +29,21 @@
 
 package org.firstinspires.ftc.teamcode.drive.samples;
 
+import com.acmerobotics.roadrunner.control.PIDFController;
+import com.acmerobotics.roadrunner.geometry.Vector2d;
+import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.Gamepad;
+import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
+
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
+import org.firstinspires.ftc.teamcode.drive.DriveConstants;
+import org.firstinspires.ftc.teamcode.drive.SampleMecanumDrive;
 
 /*
  * This file contains an example of an iterative (Non-Linear) "OpMode".
@@ -81,11 +90,14 @@ public class BasicOpMode_Iterative extends OpMode
     private Servo clawServo = null;
     private Servo wristServo = null;
 
-    final double MAX_POWER = 0.4;
+    final double MAX_POWER = 0.3;
     final double SERVO_WAIT = 1.1;
+
+    private IMU imu = null;
 
     private ElapsedTime stopWatchDrone = new ElapsedTime();
     private ElapsedTime stopWatchClaw = new ElapsedTime();
+    private PIDFController headingController = new PIDFController(SampleMecanumDrive.HEADING_PID);
 
 
     ServoRotateState servoState = ServoRotateState.NORMAL;
@@ -125,6 +137,19 @@ public class BasicOpMode_Iterative extends OpMode
         leftBackDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         rightBackDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
+        RevHubOrientationOnRobot.LogoFacingDirection logoDirection = RevHubOrientationOnRobot.LogoFacingDirection.UP;
+        RevHubOrientationOnRobot.UsbFacingDirection  usbDirection  = RevHubOrientationOnRobot.UsbFacingDirection.LEFT;
+        RevHubOrientationOnRobot orientationOnRobot = new RevHubOrientationOnRobot(logoDirection, usbDirection);
+
+        // Now initialize the IMU with this mounting orientation
+        // This sample expects the IMU to be in a REV Hub and named "imu".
+        imu = hardwareMap.get(IMU.class, "imu");
+        imu.initialize(new IMU.Parameters(orientationOnRobot));
+
+        // heading controller limit
+        headingController.setInputBounds(-Math.PI, Math.PI);
+
+
         // Tell the driver that initialization is complete.
         telemetry.addData("Status", "Initialized");
     }
@@ -148,6 +173,7 @@ public class BasicOpMode_Iterative extends OpMode
         stopWatchClaw.reset();
         stopWatchDrone.reset();
         runtime.reset();
+
     }
 
     public void updateClaw(Gamepad gamepad) {
@@ -239,9 +265,31 @@ public class BasicOpMode_Iterative extends OpMode
         double max;
 
         // POV Mode uses left joystick to go forward & strafe, and right joystick to rotate.
-        double axial   = -gamepad1.left_stick_y;  // Note: pushing stick forward gives negative value
-        double lateral =  gamepad1.left_stick_x;
-        double yaw     =  gamepad1.right_stick_x;
+//        double axial   = -gamepad1.left_stick_y;  // Note: pushing stick forward gives negative value
+//        double lateral =  gamepad1.left_stick_x;
+//        double yaw     =  gamepad1.right_stick_x;
+
+        Vector2d input = new Vector2d(
+                gamepad1.left_stick_x,
+                -gamepad1.left_stick_y
+        ).rotated(-getHeading());
+
+        double axial = input.getY();
+        double lateral = input.getX();
+
+        // calculate the rotation and correction
+        double rotation = (
+                gamepad1.right_stick_x
+        );
+
+        // set headingInput to rotation if gamepad shows activities
+        // otherwise rotate to correct heading
+        double yaw = rotation;
+        if (Math.abs(rotation) <= 0.05) {
+            yaw = (headingController.update(getHeading()) * 0.05);
+//                    * DriveConstants.kV;
+//                    * DriveConstants.TRACK_WIDTH;
+        }
 
         // Combine the joystick requests for each axis-motion to determine each wheel's power.
         // Set up a variable for each drive wheel to save the power level for telemetry.
@@ -268,6 +316,12 @@ public class BasicOpMode_Iterative extends OpMode
         leftBackDrive.setPower(leftBackPower);
         rightBackDrive.setPower(rightBackPower);
 
+
+        // update the heeading target
+        if (Math.abs(rotation) > 0.05) {
+            headingController.setTargetPosition(getHeading());
+        }
+
         // Show the elapsed game time and wheel power.
         telemetry.addData("Status", "Run Time: " + runtime.toString());
         telemetry.addData("Front left/Right", "%4.2f, %4.2f", leftFrontPower, rightFrontPower);
@@ -290,6 +344,11 @@ public class BasicOpMode_Iterative extends OpMode
      */
     @Override
     public void stop() {
+    }
+
+    public double getHeading() {
+        YawPitchRollAngles orientation = imu.getRobotYawPitchRollAngles();
+        return orientation.getYaw(AngleUnit.RADIANS);
     }
 
 }
