@@ -286,7 +286,7 @@ public class BasicOpMode_Iterative extends OpMode
         // otherwise rotate to correct heading
         double yaw = rotation;
         if (Math.abs(rotation) <= 0.05) {
-            yaw = (headingController.update(getHeading()) * 0.05);
+            yaw = (headingController.update(getHeading()) * 0.006);
 //                    * DriveConstants.kV;
 //                    * DriveConstants.TRACK_WIDTH;
         }
