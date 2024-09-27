@@ -33,8 +33,8 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.Gamepad;
+import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
-import com.qualcomm.robotcore.util.Range;
 
 /*
  * This file contains an example of an iterative (Non-Linear) "OpMode".
@@ -50,16 +50,46 @@ import com.qualcomm.robotcore.util.Range;
  * Remove or comment out the @Disabled line to add this OpMode to the Driver Station OpMode list
  */
 
+
 @TeleOp(name="Basic: Iterative OpMode", group="Iterative OpMode")
 //@Disabled
 public class BasicOpMode_Iterative extends OpMode
 {
+
+    public enum ServoRotateState {
+        NORMAL,
+        GO_LEFT,
+        GO_RIGHT
+    };
+
+    public enum ClawState {
+        NORMAL,
+        WRIST_DOWN,
+        CLAW_RELEASE,
+        CLAW_CLOSE,
+        WRIST_UP
+    }
+
     // Declare OpMode members.
     private ElapsedTime runtime = new ElapsedTime();
     private DcMotor leftFrontDrive = null;
     private DcMotor rightFrontDrive = null;
     private DcMotor leftBackDrive = null;
     private DcMotor rightBackDrive = null;
+
+    private Servo testServo = null;
+    private Servo clawServo = null;
+    private Servo wristServo = null;
+
+    final double MAX_POWER = 0.4;
+    final double SERVO_WAIT = 1.1;
+
+    private ElapsedTime stopWatchDrone = new ElapsedTime();
+    private ElapsedTime stopWatchClaw = new ElapsedTime();
+
+
+    ServoRotateState servoState = ServoRotateState.NORMAL;
+    ClawState clawState = ClawState.NORMAL;
 
     /*
      * Code to run ONCE when the driver hits INIT
@@ -76,6 +106,10 @@ public class BasicOpMode_Iterative extends OpMode
 
         leftBackDrive  = hardwareMap.get(DcMotor.class, "left_back_drive");
         rightBackDrive = hardwareMap.get(DcMotor.class, "right_back_drive");
+
+        testServo = hardwareMap.get(Servo.class, "test");
+        clawServo = hardwareMap.get(Servo.class, "claw");
+        wristServo = hardwareMap.get(Servo.class, "wrist");
 
         // To drive forward, most robots need the motor on one side to be reversed, because the axles point in opposite directions.
         // Pushing the left stick forward MUST make robot go forward. So adjust these two lines based on your first test drive.
@@ -100,6 +134,10 @@ public class BasicOpMode_Iterative extends OpMode
      */
     @Override
     public void init_loop() {
+
+        wristServo.setPosition(0);
+        clawServo.setPosition(0);
+        testServo.setPosition(1);
     }
 
     /*
@@ -107,7 +145,94 @@ public class BasicOpMode_Iterative extends OpMode
      */
     @Override
     public void start() {
+        stopWatchClaw.reset();
+        stopWatchDrone.reset();
         runtime.reset();
+    }
+
+    public void updateClaw(Gamepad gamepad) {
+        switch (clawState) {
+            case NORMAL:
+                if (stopWatchClaw.time() > SERVO_WAIT) {
+                    if (gamepad.y) {
+                        wristServo.setPosition(1);
+                        stopWatchClaw.reset();
+                        clawState = ClawState.WRIST_DOWN;
+                    }
+                }
+                break;
+
+            case WRIST_DOWN:
+                // reset to normal
+                if (stopWatchClaw.time() > SERVO_WAIT) {
+                    clawServo.setPosition(1);
+                    stopWatchClaw.reset();
+                    clawState = ClawState.CLAW_CLOSE;
+                }
+                break;
+
+            case CLAW_CLOSE:
+                if (stopWatchClaw.time() > SERVO_WAIT) {
+                    if (gamepad.y) {
+                        wristServo.setPosition(0);
+                        stopWatchClaw.reset();
+                        clawState = ClawState.WRIST_UP;
+                    }
+                }
+                break;
+
+            case WRIST_UP:
+                // reset to normal
+                if (stopWatchClaw.time() > SERVO_WAIT) {
+                    clawServo.setPosition(0);
+                    stopWatchClaw.reset();
+                    clawState = ClawState.NORMAL;
+                }
+                break;
+        }
+
+    }
+
+    public void updateDroneServo(Gamepad gamepad, double waitTime) {
+
+        // return to normal if x is pressed again
+        switch (servoState) {
+            case NORMAL:
+                if (stopWatchDrone.time() > waitTime) {
+                    if (gamepad.x) {
+                        testServo.setPosition(0);
+                        // set timer and change state to WAIT
+                        stopWatchDrone.reset();
+                        servoState = ServoRotateState.GO_LEFT;
+                    }
+                }
+                break;
+
+            case GO_LEFT:
+                // reset to normal
+                if (stopWatchDrone.time() > waitTime) {
+                    testServo.setPosition(1);
+                    stopWatchDrone.reset();
+                    servoState = ServoRotateState.GO_RIGHT;
+                }
+                break;
+
+            case GO_RIGHT:
+                // reset to normal
+                if (stopWatchDrone.time() > waitTime) {
+                    testServo.setPosition(0);
+                    stopWatchDrone.reset();
+                    servoState = ServoRotateState.GO_LEFT;
+                }
+                break;
+        }
+
+        if (gamepad.a && servoState != ServoRotateState.NORMAL) {
+            testServo.setPosition(1);
+            stopWatchDrone.reset();
+            servoState = ServoRotateState.NORMAL;
+        }
+
     }
 
     public void updateDrive(Gamepad gamepad1) {
@@ -131,11 +256,11 @@ public class BasicOpMode_Iterative extends OpMode
         max = Math.max(max, Math.abs(leftBackPower));
         max = Math.max(max, Math.abs(rightBackPower));
 
-        if (max > 1.0) {
-            leftFrontPower  /= max;
-            rightFrontPower /= max;
-            leftBackPower   /= max;
-            rightBackPower  /= max;
+        if (max > MAX_POWER) {
+            leftFrontPower  /= max * MAX_POWER;
+            rightFrontPower /= max * MAX_POWER;
+            leftBackPower   /= max * MAX_POWER;
+            rightBackPower  /= max * MAX_POWER;
         }
 
         leftFrontDrive.setPower(leftFrontPower);
@@ -156,6 +281,8 @@ public class BasicOpMode_Iterative extends OpMode
     public void loop() {
         // Setup a variable for each drive wheel to save power level for telemetry
         updateDrive(gamepad1);
+        updateDroneServo(gamepad1, 1.2);
+        updateClaw(gamepad1);
     }
 
     /*
