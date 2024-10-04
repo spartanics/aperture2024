@@ -90,7 +90,7 @@ public class BasicOpMode_Iterative extends OpMode
     private Servo clawServo = null;
     private Servo wristServo = null;
 
-    final double MAX_POWER = 0.3;
+    final double MAX_POWER = 0.5;
     final double SERVO_WAIT = 1.1;
 
     private IMU imu = null;
@@ -261,6 +261,46 @@ public class BasicOpMode_Iterative extends OpMode
 
     }
 
+    public void moveRobot(double axial, double lateral, double yaw, double rotation) {
+        // Combine the joystick requests for each axis-motion to determine each wheel's power.
+        // Set up a variable for each drive wheel to save the power level for telemetry.
+        double leftFrontPower  = axial + lateral + yaw;
+        double rightFrontPower = axial - lateral - yaw;
+        double leftBackPower   = axial - lateral + yaw;
+        double rightBackPower  = axial + lateral - yaw;
+        double max = 0;
+
+        // Normalize the values so no wheel power exceeds 100%
+        // This ensures that the robot maintains the desired motion.
+        max = Math.max(Math.abs(leftFrontPower), Math.abs(rightFrontPower));
+        max = Math.max(max, Math.abs(leftBackPower));
+        max = Math.max(max, Math.abs(rightBackPower));
+
+        if (max > 1.0) {
+            leftFrontPower  /= max;
+            rightFrontPower /= max;
+            leftBackPower   /= max;
+            rightBackPower  /= max;
+        }
+
+        leftFrontDrive.setPower(leftFrontPower * MAX_POWER);
+        rightFrontDrive.setPower(rightFrontPower * MAX_POWER);
+        leftBackDrive.setPower(leftBackPower * MAX_POWER);
+        rightBackDrive.setPower(rightBackPower * MAX_POWER);
+
+
+        // update the heeading target
+        if (Math.abs(rotation) > 0.05) {
+            headingController.setTargetPosition(getHeading());
+        }
+
+        // Show the elapsed game time and wheel power.
+        telemetry.addData("Status", "Run Time: " + runtime.toString());
+        telemetry.addData("Front left/Right", "%4.2f, %4.2f", leftFrontPower, rightFrontPower);
+        telemetry.addData("Back  left/Right", "%4.2f, %4.2f", leftBackPower, rightBackPower);
+        telemetry.update();
+    }
+
     public void updateDrive(Gamepad gamepad1) {
         double max;
 
@@ -291,42 +331,7 @@ public class BasicOpMode_Iterative extends OpMode
 //                    * DriveConstants.TRACK_WIDTH;
         }
 
-        // Combine the joystick requests for each axis-motion to determine each wheel's power.
-        // Set up a variable for each drive wheel to save the power level for telemetry.
-        double leftFrontPower  = axial + lateral + yaw;
-        double rightFrontPower = axial - lateral - yaw;
-        double leftBackPower   = axial - lateral + yaw;
-        double rightBackPower  = axial + lateral - yaw;
-
-        // Normalize the values so no wheel power exceeds 100%
-        // This ensures that the robot maintains the desired motion.
-        max = Math.max(Math.abs(leftFrontPower), Math.abs(rightFrontPower));
-        max = Math.max(max, Math.abs(leftBackPower));
-        max = Math.max(max, Math.abs(rightBackPower));
-
-        if (max > MAX_POWER) {
-            leftFrontPower  /= max * MAX_POWER;
-            rightFrontPower /= max * MAX_POWER;
-            leftBackPower   /= max * MAX_POWER;
-            rightBackPower  /= max * MAX_POWER;
-        }
-
-        leftFrontDrive.setPower(leftFrontPower);
-        rightFrontDrive.setPower(rightFrontPower);
-        leftBackDrive.setPower(leftBackPower);
-        rightBackDrive.setPower(rightBackPower);
-
-
-        // update the heeading target
-        if (Math.abs(rotation) > 0.05) {
-            headingController.setTargetPosition(getHeading());
-        }
-
-        // Show the elapsed game time and wheel power.
-        telemetry.addData("Status", "Run Time: " + runtime.toString());
-        telemetry.addData("Front left/Right", "%4.2f, %4.2f", leftFrontPower, rightFrontPower);
-        telemetry.addData("Back  left/Right", "%4.2f, %4.2f", leftBackPower, rightBackPower);
-        telemetry.update();
+        moveRobot(axial, lateral, yaw, rotation);
     }
     /*
      * Code to run REPEATEDLY after the driver hits PLAY but before they hit STOP
