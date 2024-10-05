@@ -35,6 +35,7 @@ import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.Servo;
@@ -42,7 +43,6 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
-import org.firstinspires.ftc.teamcode.drive.DriveConstants;
 import org.firstinspires.ftc.teamcode.drive.SampleMecanumDrive;
 
 /*
@@ -76,7 +76,7 @@ public class BasicOpMode_Iterative extends OpMode
         WRIST_DOWN,
         CLAW_RELEASE,
         CLAW_CLOSE,
-        WRIST_UP
+        WRIST_DOWN_STILL_HOLD, WRIST_DOWN_CLAW_RELEASE, WRIST_UP_STILL_HOLD
     }
 
     // Declare OpMode members.
@@ -131,6 +131,11 @@ public class BasicOpMode_Iterative extends OpMode
         rightFrontDrive.setDirection(DcMotor.Direction.REVERSE);
         rightBackDrive.setDirection(DcMotor.Direction.REVERSE);
 
+//        leftFrontDrive.setDirection(DcMotor.Direction.REVERSE);
+//        leftBackDrive.setDirection(DcMotor.Direction.REVERSE);
+//        rightFrontDrive.setDirection(DcMotor.Direction.FORWARD);
+//        rightBackDrive.setDirection(DcMotor.Direction.FORWARD);
+
         // Setting the back drive to just cruise
         leftFrontDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         rightFrontDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
@@ -163,6 +168,7 @@ public class BasicOpMode_Iterative extends OpMode
         wristServo.setPosition(0);
         clawServo.setPosition(0);
         testServo.setPosition(1);
+        imu.resetYaw();
     }
 
     /*
@@ -202,19 +208,39 @@ public class BasicOpMode_Iterative extends OpMode
                     if (gamepad.y) {
                         wristServo.setPosition(0);
                         stopWatchClaw.reset();
-                        clawState = ClawState.WRIST_UP;
+                        clawState = ClawState.WRIST_UP_STILL_HOLD;
                     }
                 }
                 break;
 
-            case WRIST_UP:
+            case WRIST_UP_STILL_HOLD:
                 // reset to normal
                 if (stopWatchClaw.time() > SERVO_WAIT) {
+                    if (gamepad.y) {
+                        wristServo.setPosition(1);
+                        stopWatchClaw.reset();
+                        clawState = ClawState.WRIST_DOWN_STILL_HOLD;
+                    }
+                }
+                break;
+
+            case WRIST_DOWN_STILL_HOLD:
+                if (stopWatchClaw.time() > SERVO_WAIT) {
+                    clawServo.setPosition(0);
+                    stopWatchClaw.reset();
+                    clawState = ClawState.WRIST_DOWN_CLAW_RELEASE;
+                }
+                break;
+
+            case WRIST_DOWN_CLAW_RELEASE:
+                if (stopWatchClaw.time() > SERVO_WAIT) {
+                    wristServo.setPosition(0);
                     clawServo.setPosition(0);
                     stopWatchClaw.reset();
                     clawState = ClawState.NORMAL;
                 }
                 break;
+
         }
 
     }
